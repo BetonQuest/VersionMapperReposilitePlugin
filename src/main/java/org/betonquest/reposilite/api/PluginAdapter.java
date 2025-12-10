@@ -2,6 +2,7 @@ package org.betonquest.reposilite.api;
 
 import com.reposilite.Reposilite;
 import com.reposilite.configuration.shared.api.SharedSettings;
+import com.reposilite.maven.api.DeployEvent;
 import com.reposilite.plugin.api.Facade;
 import com.reposilite.plugin.api.ReposiliteDisposeEvent;
 import com.reposilite.plugin.api.ReposiliteInitializeEvent;
@@ -64,6 +65,7 @@ public abstract class PluginAdapter<F extends Facade, T extends SharedSettings> 
         extensions().registerEvent(ReposiliteStartedEvent.class, this::onStart);
         extensions().registerEvent(ReposiliteDisposeEvent.class, this::onDispose);
         extensions().registerEvent(RoutingSetupEvent.class, this::onRoutingSetup);
+        extensions().registerEvent(DeployEvent.class, this::onDeploy);
 
         return facade;
     }
@@ -114,6 +116,15 @@ public abstract class PluginAdapter<F extends Facade, T extends SharedSettings> 
      */
     public void onDispose(final ReposiliteDisposeEvent event) {
         // Empty
+    }
+
+    /**
+     * Called when a file is deployed.
+     *
+     * @param event the {@link DeployEvent} called for this plugin
+     */
+    public void onDeploy(final DeployEvent event) {
+        // Empy
     }
 
     /**

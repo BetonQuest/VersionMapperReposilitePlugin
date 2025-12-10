@@ -1,6 +1,7 @@
 package org.betonquest.reposilite.mapper;
 
 import com.reposilite.maven.MavenFacade;
+import com.reposilite.maven.api.DeployEvent;
 import com.reposilite.plugin.api.Facade;
 import com.reposilite.plugin.api.Plugin;
 import com.reposilite.plugin.api.ReposiliteInitializeEvent;
@@ -60,10 +61,13 @@ public class VersionMapperPlugin extends PluginAdapter<VersionMapperFacade, Vers
     @Override
     public void onInitialize(final ReposiliteInitializeEvent event) {
         info("Initialized!");
+
         this.restfulImplementation = new RestfulRoutes(getFacade(MavenFacade.class), baseFacade);
+
         final MutableReference<VersionMapperPluginSettings> config = getConfig();
         final VersionMapperPluginSettings settings = config.get();
         config.subscribe(sets -> ValidationResult.printBlock(sets.validate(baseFacade), this::warn, this::info, ValidationLogLevel.ERRORS_ONLY));
+
         final List<String> artifacts = settings.getArtifacts().stream().map(Artifact::id).toList();
         final String list = String.join(", ", artifacts);
         info("Loaded " + artifacts.size() + " artifacts: ");
@@ -82,6 +86,14 @@ public class VersionMapperPlugin extends PluginAdapter<VersionMapperFacade, Vers
         final List<ValidationResult> validate = getConfig().get().validate(baseFacade);
         ValidationResult.printBlock(validate, this::warn, this::info, ValidationLogLevel.ALL);
         getConfig().subscribe(settings -> updateCache());
+    }
+
+    @Override
+    public void onDeploy(final DeployEvent event) {
+        final Artifact artifact = baseFacade.findArtifact(event.getRepository().getName(), event.getGav());
+        if (artifact == null) return;
+        if (artifactsVersionsCache.hasEntry(artifact.artifactId()))
+            updateCache();
     }
 
     @Override
