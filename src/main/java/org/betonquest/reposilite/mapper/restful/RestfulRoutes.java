@@ -24,7 +24,9 @@ import org.betonquest.reposilite.mapper.integration.VersionMapperFacade;
 import org.betonquest.reposilite.mapper.settings.Artifact;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -127,7 +129,7 @@ public class RestfulRoutes extends MavenRoutes implements RestfulDefinitions {
             final Predicate<PomVersionedEntry> queryParamFilter = version ->
                     considerSnapshots && version.isSnapshot() || considerReleases && !version.isSnapshot();
 
-            final JsonArray result = resolve(versions, queryParamFilter);
+            final JsonObject result = resolve(versions, queryParamFilter);
 
             ctx.status(HttpStatus.OK).result(gson.toJson(result));
             return null;
@@ -138,17 +140,30 @@ public class RestfulRoutes extends MavenRoutes implements RestfulDefinitions {
         return ctx.queryParamAsClass(param, result).getOrDefault(defaultValue);
     }
 
-    private JsonArray resolve(final List<PomVersionedEntry> versions, final Predicate<PomVersionedEntry> queryParamFilter) {
-        return versions.stream()
+    private JsonObject resolve(final List<PomVersionedEntry> versions, final Predicate<PomVersionedEntry> queryParamFilter) {
+        final Map<String, JsonArray> groups = versions.stream()
                 .filter(queryParamFilter)
-                .map(version -> {
-                    final JsonObject jsonObject = new JsonObject();
-                    jsonObject.addProperty("group", version.group());
-                    jsonObject.addProperty("maven", version.maven());
-                    jsonObject.addProperty("pom", version.pom());
-                    jsonObject.addProperty("jar", version.jarLocation().toString());
-                    return jsonObject;
-                }).collect(JsonArray::new, JsonArray::add, JsonArray::addAll);
+                .map(PomVersionedEntry::group)
+                .map(group -> Map.entry(group, new JsonArray()))
+                .distinct().collect(HashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue()), HashMap::putAll);
+        versions.stream()
+                .filter(queryParamFilter)
+                .forEach(version -> {
+                    groups.get(version.group()).add(buildPomEntries(version));
+                });
+        final JsonObject entry = new JsonObject();
+        groups.forEach(entry::add);
+        return entry;
+    }
+
+    private JsonObject buildPomEntries(final PomVersionedEntry entry) {
+        final JsonObject parent = new JsonObject();
+        final JsonObject pomVersions = new JsonObject();
+        entry.pom().forEach(pomVersions::addProperty);
+        parent.addProperty("maven", entry.maven());
+        parent.addProperty("jar", entry.jarLocation().toString());
+        parent.add("entries", pomVersions);
+        return parent;
     }
 
     @Override

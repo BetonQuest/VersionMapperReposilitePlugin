@@ -30,7 +30,7 @@ public record Artifact(
         @Doc(title = "Repository", description = "The repository the artifact is sourced from") String repository,
         @Doc(title = "GroupId", description = "The groupId of the artifact") String groupId,
         @Doc(title = "ArtifactId", description = "The Id of the artifact") String artifactId,
-        @Doc(title = "pom.xml - Version XPath", description = "The xpath leading to an artifact version in pom.xml") String versionXPath) {
+        @Doc(title = "xPaths", description = "The xpaths leading to an artifact version in pom.xml") List<XPathEntry> versionXPath) {
 
     /**
      * Regex for artifactId to check naming conventions as defined by Apache Maven.

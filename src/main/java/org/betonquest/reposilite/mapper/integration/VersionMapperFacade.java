@@ -15,6 +15,7 @@ import com.reposilite.storage.api.Location;
 import org.betonquest.reposilite.api.PluginAdapter;
 import org.betonquest.reposilite.mapper.settings.Artifact;
 import org.betonquest.reposilite.mapper.settings.VersionMapperPluginSettings;
+import org.betonquest.reposilite.mapper.settings.XPathEntry;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.w3c.dom.Document;
@@ -25,13 +26,12 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -210,34 +210,43 @@ public class VersionMapperFacade implements Facade, EventListener<ReposiliteInit
         if (repository == null || !hasArtifact(artifact.repository(), gav)) {
             return List.of();
         }
-        final XPathExpression xpathExpression = getXPath().compile(artifact.versionXPath());
         final DocumentBuilder documentBuilder = getDocumentBuilder();
         final List<PomVersionedEntry> versions = new ArrayList<>();
         final List<Location> pomLocations = getMavenVersions(artifact, "pom");
         for (final Location pomLocation : pomLocations) {
-            versions.add(readEntry(artifact, pomLocation, documentBuilder, xpathExpression));
+            final PomVersionedEntry entry = readEntry(artifact, pomLocation, documentBuilder);
+            versions.add(entry);
         }
         return versions;
     }
 
-    private PomVersionedEntry readEntry(final Artifact artifact, final Location pomLocation, final DocumentBuilder documentBuilder, final XPathExpression xpathExpression) {
+    private PomVersionedEntry readEntry(final Artifact artifact, final Location pomLocation, final DocumentBuilder documentBuilder) {
         final Result<ResolvedDocument, ErrorResponse> pomFile = mavenFacade.findFile(new LookupRequest(null, artifact.repository(), pomLocation));
         if (pomFile.isErr()) {
             plugin.warn(pomFile.getError().getMessage());
             return null;
         }
+        final Map<String, String> xPathVersions = new HashMap<>();
+        final XPath xPath = getXPath();
         try {
             final Document parse = documentBuilder.parse(pomFile.get().getContent());
-            final String pomVersion = (String) xpathExpression.evaluate(parse, XPathConstants.STRING);
-            final Location jarLocation = pomLocation.replace(".pom", ".jar");
-            final String rawName = pomLocation.getSimpleName();
-            final String groupVersion = pomLocation.getParent().getSimpleName();
-            final String mavenVersion = rawName.substring(rawName.indexOf('-') + 1, rawName.lastIndexOf('.'));
-            return new PomVersionedEntry(artifact, groupVersion, mavenVersion, pomVersion, jarLocation);
-        } catch (SAXException | IOException | IllegalStateException | XPathExpressionException exception) {
+            for (final XPathEntry entry : artifact.versionXPath()) {
+                try {
+                    xPathVersions.put(entry.id(), entry.parse(xPath, parse));
+                } catch (final XPathExpressionException exception) {
+                    plugin.warn("Error while reading xPath \"" + entry.id() + "\" in artifact \"" + artifact.id() + "\" - " + exception.getMessage());
+                    plugin.getLogger().exception(exception);
+                }
+            }
+        } catch (SAXException | IOException | IllegalStateException exception) {
             plugin.warn("Error while generating version mappings. " + exception.getMessage());
             plugin.getLogger().exception(exception);
         }
-        return null;
+
+        final Location jarLocation = pomLocation.replace(".pom", ".jar");
+        final String groupVersion = pomLocation.getParent().getSimpleName();
+        final String rawName = pomLocation.getSimpleName();
+        final String mavenVersion = rawName.substring(rawName.indexOf('-') + 1, rawName.lastIndexOf('.'));
+        return new PomVersionedEntry(artifact, groupVersion, mavenVersion, xPathVersions, jarLocation);
     }
 }

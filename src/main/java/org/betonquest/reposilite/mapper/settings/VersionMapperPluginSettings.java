@@ -2,6 +2,7 @@ package org.betonquest.reposilite.mapper.settings;
 
 import com.reposilite.configuration.shared.api.Doc;
 import com.reposilite.configuration.shared.api.SharedSettings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.betonquest.reposilite.api.validation.Validatable;
 import org.betonquest.reposilite.api.validation.ValidationLogLevel;
 import org.betonquest.reposilite.api.validation.ValidationResult;
@@ -15,12 +16,15 @@ import java.util.List;
 @Doc(title = "VersionMapper", description = "All settings related to the advanced restful API")
 public final class VersionMapperPluginSettings implements SharedSettings, Validatable<VersionMapperFacade> {
 
+    @SuppressFBWarnings("SS_SHOULD_BE_STATIC")
     private final boolean namingConventionWarning = true;
 
+    @SuppressFBWarnings("SS_SHOULD_BE_STATIC")
     private final boolean runExistenceChecks = true;
 
     private final ValidationLogLevel validationLogLevel = ValidationLogLevel.ALL;
 
+    @SuppressFBWarnings("SE_BAD_FIELD")
     private final List<Artifact> artifacts = new ArrayList<>();
 
     public VersionMapperPluginSettings() {
@@ -51,7 +55,7 @@ public final class VersionMapperPluginSettings implements SharedSettings, Valida
         return runExistenceChecks;
     }
 
-    @Doc(title = "Resolve Requests To Unlisted Artifacts", description = "Allows to request artifacts that are not listed in the configuration.")
+    @Doc(title = "Log Level", description = "Change the amount of logs that are outputted.")
     public ValidationLogLevel getValidationLogLevel() {
         return validationLogLevel;
     }
