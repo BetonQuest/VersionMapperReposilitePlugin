@@ -1,5 +1,6 @@
 package org.betonquest.reposilite.mapper;
 
+import com.reposilite.console.ConsoleFacade;
 import com.reposilite.maven.MavenFacade;
 import com.reposilite.maven.api.DeployEvent;
 import com.reposilite.plugin.api.Facade;
@@ -12,6 +13,7 @@ import com.reposilite.web.api.RoutingSetupEvent;
 import org.betonquest.reposilite.api.PluginAdapter;
 import org.betonquest.reposilite.api.validation.ValidationLogLevel;
 import org.betonquest.reposilite.api.validation.ValidationResult;
+import org.betonquest.reposilite.mapper.command.UpdateCacheCommand;
 import org.betonquest.reposilite.mapper.integration.ArtifactsVersionsCache;
 import org.betonquest.reposilite.mapper.integration.VersionMapperFacade;
 import org.betonquest.reposilite.mapper.restful.RestfulRoutes;
@@ -55,6 +57,7 @@ public class VersionMapperPlugin extends PluginAdapter<VersionMapperFacade, Vers
     @Override
     public Facade onLoad() {
         extensions().registerEvent(ReposiliteInitializeEvent.class, this.baseFacade);
+        extensions().facade(ConsoleFacade.class).registerCommand(new UpdateCacheCommand(this::updateCache));
         return baseFacade;
     }
 
@@ -106,6 +109,8 @@ public class VersionMapperPlugin extends PluginAdapter<VersionMapperFacade, Vers
     }
 
     private void updateCache() {
+        final List<ValidationResult> validate = getConfig().get().validate(baseFacade);
+        ValidationResult.printBlock(validate, this::warn, this::info, getConfig().get().getValidationLogLevel());
         final List<Artifact> artifacts = getConfig().get().getArtifacts();
         for (final Artifact artifact : artifacts) {
             if (artifactsVersionsCache.attemptToCache(artifact)) {
