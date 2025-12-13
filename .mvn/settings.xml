@@ -6,7 +6,7 @@
     <mirror>
       <id>BetonQuest-Mirror</id>
       <url>https://repo.betonquest.org/mirror</url>
-      <mirrorOf>*</mirrorOf>
+      <mirrorOf>*,!Reposilite-Releases</mirrorOf>
     </mirror>
   </mirrors>
 
