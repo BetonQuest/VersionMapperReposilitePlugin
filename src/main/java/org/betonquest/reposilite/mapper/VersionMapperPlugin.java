@@ -91,9 +91,12 @@ public class VersionMapperPlugin extends PluginAdapter<VersionMapperFacade, Vers
     @Override
     public void onDeploy(final DeployEvent event) {
         final Artifact artifact = baseFacade.findArtifact(event.getRepository().getName(), event.getGav());
-        if (artifact == null) return;
-        if (artifactsVersionsCache.hasEntry(artifact.artifactId()))
+        if (artifact == null) {
+            return;
+        }
+        if (artifactsVersionsCache.hasEntry(artifact.artifactId())) {
             updateCache();
+        }
     }
 
     @Override

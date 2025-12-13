@@ -19,7 +19,7 @@ import panda.std.reactive.MutableReference;
  * @param <F> the {@link Facade} api type of the plugin
  * @param <T> the {@link SharedSettings} type of the plugin
  */
-@SuppressWarnings("PMD.EmptyMethodInAbstractClassShouldBeAbstract")
+@SuppressWarnings({"PMD.EmptyMethodInAbstractClassShouldBeAbstract", "PMD.TooManyMethods"})
 public abstract class PluginAdapter<F extends Facade, T extends SharedSettings> extends ReposilitePlugin {
 
     /**
