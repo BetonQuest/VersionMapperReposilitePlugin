@@ -6,12 +6,13 @@ import org.betonquest.reposilite.mapper.settings.Artifact;
 /**
  * Represents a pom versioned entry in the maven repository.
  *
- * @param artifact     the versioned artifact
- * @param mavenVersion the maven version
- * @param pomVersion   the version defined in the pom and extracted from the artifact
- * @param jarLocation  the location of the jar file related to the pom
+ * @param group       the group of the artifact
+ * @param artifact    the versioned artifact
+ * @param maven       the maven version
+ * @param pom         the version defined in the pom and extracted from the artifact
+ * @param jarLocation the location of the jar file related to the pom
  */
-public record PomVersionedEntry(Artifact artifact, String mavenVersion, String pomVersion, Location jarLocation) {
+public record PomVersionedEntry(Artifact artifact, String group, String maven, String pom, Location jarLocation) {
 
     /**
      * Checks if the maven version is a snapshot version.
@@ -19,6 +20,6 @@ public record PomVersionedEntry(Artifact artifact, String mavenVersion, String p
      * @return true if the maven version ends with "-SNAPSHOT", false otherwise
      */
     public boolean isSnapshot() {
-        return mavenVersion.endsWith("-SNAPSHOT");
+        return group.endsWith("-SNAPSHOT");
     }
 }

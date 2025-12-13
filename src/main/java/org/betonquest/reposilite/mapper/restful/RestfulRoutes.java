@@ -143,8 +143,9 @@ public class RestfulRoutes extends MavenRoutes implements RestfulDefinitions {
                 .filter(queryParamFilter)
                 .map(version -> {
                     final JsonObject jsonObject = new JsonObject();
-                    jsonObject.addProperty("repo", version.mavenVersion());
-                    jsonObject.addProperty("pom", version.pomVersion());
+                    jsonObject.addProperty("group", version.group());
+                    jsonObject.addProperty("maven", version.maven());
+                    jsonObject.addProperty("pom", version.pom());
                     jsonObject.addProperty("jar", version.jarLocation().toString());
                     return jsonObject;
                 }).collect(JsonArray::new, JsonArray::add, JsonArray::addAll);

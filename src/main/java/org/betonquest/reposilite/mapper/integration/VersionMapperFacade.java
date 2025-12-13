@@ -4,13 +4,13 @@ import com.reposilite.maven.MavenFacade;
 import com.reposilite.maven.Repository;
 import com.reposilite.maven.api.LookupRequest;
 import com.reposilite.maven.api.ResolvedDocument;
-import com.reposilite.maven.api.VersionLookupRequest;
-import com.reposilite.maven.api.VersionsResponse;
 import com.reposilite.plugin.api.EventListener;
 import com.reposilite.plugin.api.Facade;
 import com.reposilite.plugin.api.ReposiliteInitializeEvent;
 import com.reposilite.shared.ErrorResponse;
+import com.reposilite.storage.StorageProvider;
 import com.reposilite.storage.api.FileDetails;
+import com.reposilite.storage.api.FileType;
 import com.reposilite.storage.api.Location;
 import org.betonquest.reposilite.api.PluginAdapter;
 import org.betonquest.reposilite.mapper.settings.Artifact;
@@ -33,10 +33,12 @@ import javax.xml.xpath.XPathFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Base {@link Facade} for the VersionMapperPlugin.
  */
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class VersionMapperFacade implements Facade, EventListener<ReposiliteInitializeEvent> {
 
     /**
@@ -159,6 +161,39 @@ public class VersionMapperFacade implements Facade, EventListener<ReposiliteInit
     }
 
     /**
+     * Returns all file locations of the artifact with the given extension.
+     *
+     * @param artifact  the artifact to get the versions for
+     * @param extension the extension file targeted in the artifact
+     * @return all file locations of the artifact
+     */
+    public List<Location> getMavenVersions(final Artifact artifact, final String extension) {
+        final MavenFacade mavenFacade = plugin.getFacade(MavenFacade.class);
+        final Repository repo = mavenFacade.getRepository(artifact.repository());
+        if (repo == null) {
+            plugin.warn("Repository \"" + artifact.repository() + "\" not found.");
+            return List.of();
+        }
+        final StorageProvider storageProvider = repo.getStorageProvider();
+        final Result<List<Location>, ErrorResponse> files = storageProvider.getFiles(artifact.gav());
+        if (files.isErr()) {
+            plugin.warn("Error while listing files: " + files.getError().getMessage());
+            return List.of();
+        }
+        final List<Location> versionPoms = files.get().stream()
+                .map(loc -> Map.entry(loc, storageProvider.getFileDetails(loc)))
+                .filter(entry -> entry.getValue().isOk())
+                .map(entry -> Map.entry(entry.getKey(), entry.getValue().get()))
+                .filter(entry -> entry.getValue().getType() == FileType.DIRECTORY)
+                .map(Map.Entry::getKey)
+                .flatMap(loc -> storageProvider.getFiles(loc).orElseGet(error -> List.of()).stream())
+                .filter(loc -> loc.endsWith("." + extension))
+                .toList();
+        plugin.info("versions found: " + versionPoms.size());
+        return versionPoms;
+    }
+
+    /**
      * Read all versions known to {@link MavenFacade} for a given artifact.
      * Maps all versions according to the configured XPath expression in the artifact
      * settings to create {@link PomVersionedEntry}s.
@@ -175,41 +210,34 @@ public class VersionMapperFacade implements Facade, EventListener<ReposiliteInit
         if (repository == null || !hasArtifact(artifact.repository(), gav)) {
             return List.of();
         }
-
         final XPathExpression xpathExpression = getXPath().compile(artifact.versionXPath());
         final DocumentBuilder documentBuilder = getDocumentBuilder();
-
         final List<PomVersionedEntry> versions = new ArrayList<>();
-        final List<String> mavenVersions = getMavenVersions(artifact.repository(), gav);
-        for (final String version : mavenVersions) {
-            final Location pom = artifact.versionedGav(version, ".pom");
-            final Result<ResolvedDocument, ErrorResponse> pomFile = mavenFacade.findFile(new LookupRequest(null, artifact.repository(), pom));
-            if (pomFile.isErr()) {
-                plugin.warn(pomFile.getError().getMessage());
-                continue;
-            }
-            try {
-                final Document parse = documentBuilder.parse(pomFile.get().getContent());
-                final String pomVersion = (String) xpathExpression.evaluate(parse, XPathConstants.STRING);
-                final Location jar = artifact.versionedGav(version, ".jar");
-                versions.add(new PomVersionedEntry(artifact, version, pomVersion, jar));
-            } catch (SAXException | IOException | IllegalStateException exception) {
-                plugin.warn("Error while generating version mappings. " + exception.getMessage());
-                plugin.getLogger().exception(exception);
-            }
+        final List<Location> pomLocations = getMavenVersions(artifact, "pom");
+        for (final Location pomLocation : pomLocations) {
+            versions.add(readEntry(artifact, pomLocation, documentBuilder, xpathExpression));
         }
         return versions;
     }
 
-    private List<String> getMavenVersions(final String repository, final Location location) {
-        final Repository repo = mavenFacade.getRepository(repository);
-        if (repo == null) {
-            return List.of();
+    private PomVersionedEntry readEntry(final Artifact artifact, final Location pomLocation, final DocumentBuilder documentBuilder, final XPathExpression xpathExpression) {
+        final Result<ResolvedDocument, ErrorResponse> pomFile = mavenFacade.findFile(new LookupRequest(null, artifact.repository(), pomLocation));
+        if (pomFile.isErr()) {
+            plugin.warn(pomFile.getError().getMessage());
+            return null;
         }
-        final Result<VersionsResponse, ErrorResponse> versions = mavenFacade.findVersions(new VersionLookupRequest(null, repo, location, null));
-        if (versions.isErr()) {
-            return List.of();
+        try {
+            final Document parse = documentBuilder.parse(pomFile.get().getContent());
+            final String pomVersion = (String) xpathExpression.evaluate(parse, XPathConstants.STRING);
+            final Location jarLocation = pomLocation.replace(".pom", ".jar");
+            final String rawName = pomLocation.getSimpleName();
+            final String groupVersion = pomLocation.getParent().getSimpleName();
+            final String mavenVersion = rawName.substring(rawName.indexOf('-') + 1, rawName.lastIndexOf('.'));
+            return new PomVersionedEntry(artifact, groupVersion, mavenVersion, pomVersion, jarLocation);
+        } catch (SAXException | IOException | IllegalStateException | XPathExpressionException exception) {
+            plugin.warn("Error while generating version mappings. " + exception.getMessage());
+            plugin.getLogger().exception(exception);
         }
-        return versions.get().getVersions();
+        return null;
     }
 }
