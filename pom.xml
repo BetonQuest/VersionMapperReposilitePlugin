@@ -20,7 +20,7 @@
   <properties>
     <revision>1.0.0</revision>
     <changelist>-SNAPSHOT</changelist>
-    <kotlin.version>2.2.21</kotlin.version>
+    <kotlin.version>2.3.0</kotlin.version>
     <maven-artifact.version>4.0.0-rc-5</maven-artifact.version>
     <reposilite.version>3.5.26</reposilite.version>
   </properties>
